@@ -1,0 +1,121 @@
+{
+  "session": {
+    "date": "2026-06-10",
+    "completed_at": "2026-06-10T10:09:59Z",
+    "project": "takano32",
+    "user": "takano32@gmail.com",
+    "summary": "e2-micro インスタンスを us-central1 から us-west1 へ移行し IP を静的化。不要リソースを棚卸しして削除。"
+  },
+  "tasks": [
+    {
+      "id": 1,
+      "title": "インスタンス停止の確認",
+      "actions": [
+        "ゲスト OS からシャットダウンした e2-micro-0 (us-central1-a) が TERMINATED になったことを確認"
+      ]
+    },
+    {
+      "id": 2,
+      "title": "無料枠 (Always Free) 適合チェック",
+      "actions": [
+        "e2-micro / us-central1 / pd-standard 30GB / 静的IPなし / スナップショットなし を確認",
+        "全条件適合と判定"
+      ]
+    },
+    {
+      "id": 3,
+      "title": "us-central1 から us-west1 への移行",
+      "actions": [
+        "スナップショット e2-micro-migrate を作成",
+        "us-west1-a にディスク e2-micro (pd-standard 30GB) を作成",
+        "インスタンス e2-micro を us-west1-a に作成 (タグ http-server,https-server / serial-port-enable=true 引き継ぎ)",
+        "SSH で起動とデータ (9.7GB 使用) を確認",
+        "旧インスタンス e2-micro-0・旧ディスク・スナップショットを削除"
+      ],
+      "result": {
+        "new_instance": "e2-micro",
+        "zone": "us-west1-a",
+        "new_external_ip": "8.231.236.96",
+        "old_external_ip": "136.114.244.8",
+        "ssh_command": "gcloud compute ssh --zone us-west1-a e2-micro --project takano32"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Caddy 設定の更新",
+      "actions": [
+        "/etc/caddy/Caddyfile のドメインを 136-114-244-8.sslip.io から 8-231-236-96.sslip.io に変更しリロード",
+        "https://8-231-236-96.sslip.io/cxx_chatwork が 200 (証明書OK)、他パス 404 を確認"
+      ],
+      "notes": [
+        "ChatWork 側 Webhook URL に旧ドメインを登録している場合は要更新"
+      ]
+    },
+    {
+      "id": 5,
+      "title": "外部 IPv4 料金調査と IP の静的化",
+      "findings": {
+        "in_use_ipv4_per_hour_usd": 0.005,
+        "in_use_ipv4_per_month_usd": 3.65,
+        "unused_static_ipv4_per_hour_usd": 0.01,
+        "free_tier_exemption": false,
+        "note": "無料枠 e2-micro でも使用中の外部 IPv4 は課金対象。静的・エフェメラルは使用中なら同額。"
+      },
+      "actions": [
+        "エフェメラル IP 8.231.236.96 を静的アドレス e2-micro (us-west1) に昇格。料金据え置き・IP不変化"
+      ],
+      "notes": [
+        "インスタンス削除時は静的アドレスも削除すること (未使用放置で $0.01/時)"
+      ]
+    },
+    {
+      "id": 6,
+      "title": "コスト棚卸しと不要リソース削除",
+      "deleted": [
+        {
+          "type": "cloudbuild.trigger",
+          "name": "rmgpgab-nanaca-crash-asia-northeast1-takano32-nanaca-crash-sfff",
+          "id": "c26957b6-8bed-47d5-a1e6-23c1407a3f8e",
+          "reason": "nanaca-crash-server は GitHub Pages で代替済み"
+        },
+        {
+          "type": "cloudbuild.trigger",
+          "name": "rmgpgab-nanaca-crash-server-us-central1-takano32-nanaca-crashbd",
+          "id": "87283ec1-d645-4c01-8126-0677f87faadd",
+          "reason": "同上 (デプロイなしの旧ビルドトリガー)"
+        },
+        {
+          "type": "secretmanager.secret",
+          "name": "GitHub-github-oauthtoken-396033",
+          "reason": "削除したトリガーの GitHub 連携用で用済み"
+        }
+      ],
+      "kept": [
+        {
+          "type": "pubsub.topic",
+          "names": ["container-analysis-occurrences-v1", "container-analysis-notes-v1beta1"],
+          "reason": "Container Analysis 自動生成・サブスクリプションなしで無料"
+        }
+      ],
+      "out_of_scope": [
+        {
+          "project": "vscovid19",
+          "note": "ユーザーの所有ではないため変更せず。請求先も別アカウント。放置静的 IP 2 本 (約 $7.3/月) 等を発見したが残置。"
+        },
+        {
+          "projects": ["api-project-845573577672", "pyjcode"],
+          "note": "課金無効のため請求されない"
+        }
+      ]
+    }
+  ],
+  "final_state": {
+    "instance": {"name": "e2-micro", "zone": "us-west1-a", "machine_type": "e2-micro", "status": "RUNNING", "free_tier": true},
+    "disk": {"name": "e2-micro", "zone": "us-west1-a", "type": "pd-standard", "size_gb": 30, "free_tier": true},
+    "static_ip": {"name": "e2-micro", "address": "8.231.236.96", "region": "us-west1", "status": "IN_USE", "monthly_cost_usd": 3.65},
+    "monthly_total_usd": 3.65
+  },
+  "follow_ups": [
+    "GitHub 側の Google Cloud Build アプリ連携の棚卸し (別の機会に実施予定)"
+  ]
+}
