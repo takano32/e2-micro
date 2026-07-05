@@ -1,0 +1,7 @@
+#!/bin/bash
+# 宛先カテゴリ別の累積送信量を表示する(カウンタのロード/再起動以降)
+[ "$(id -u)" -ne 0 ] && exec sudo "$0" "$@"
+nft -j list table inet egress_acct | jq -r '
+  .nftables[] | select(has("counter")) | .counter | [.name, .bytes] | @tsv' |
+awk -F'\t' '{printf "%-20s %12.2f MB\n", $1, $2/1048576; t+=$2}
+END {printf "%-20s %12.2f MB\n", "TOTAL(non-lo)", t/1048576}'

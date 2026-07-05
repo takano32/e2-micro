@@ -1,0 +1,8 @@
+#!/bin/sh
+# Daily snapshot of egress counters (bytes, cumulative since boot/reload) for trend analysis
+LOG=/var/log/egress-acct.log
+{
+  printf '%s ' "$(date -Is)"
+  /usr/sbin/nft -j list table inet egress_acct 2>/dev/null |
+    jq -c '[.nftables[] | select(has("counter")) | .counter | {(.name): .bytes}] | add'
+} >> "$LOG"
